@@ -10,6 +10,7 @@ from captions import create_srt
 from renderer import render_short
 from research import search_news, format_research
 from trends import discover_topics
+from llm import generate_script
 
 app = Flask(__name__, static_folder="web", static_url_path="")
 
@@ -39,6 +40,7 @@ def generate():
     topic = str(data.get("topic", "")).strip()
     duration = int(data.get("duration", 45))
     narration = str(data.get("narration", "")).strip()
+    auto_script = bool(data.get("auto_script", True))
 
     if not topic:
         return jsonify({"error": "topic is required"}), 400
@@ -53,10 +55,24 @@ def generate():
         sources = search_news(topic)
     except Exception:
         sources = []
+
+    prompt = build_script_prompt(topic, duration, sources)
     research_text = format_research(sources)
-    prompt = build_script_prompt(topic, duration) + "\n\nResearch sources:\n" + research_text
     (job_dir / "research.txt").write_text(research_text + "\n", encoding="utf-8")
     (job_dir / "script_prompt.txt").write_text(prompt + "\n", encoding="utf-8")
+
+    if not narration and auto_script:
+        try:
+            narration = generate_script(prompt)
+        except Exception as exc:
+            return jsonify({
+                "job_id": job_id,
+                "status": "needs_provider",
+                "script_prompt": prompt,
+                "sources": sources,
+                "error": str(exc),
+                "hint": "Set LLM_PROVIDER=ollama for a local free model, or configure GEMINI_API_KEY for Gemini.",
+            }), 503
 
     if not narration:
         return jsonify({"job_id": job_id, "status": "needs_script", "script_prompt": prompt, "sources": sources})
@@ -76,7 +92,7 @@ def generate():
     video_path = job_dir / "final_short.mp4"
     render_short(narration, audio_path, video_path)
 
-    return jsonify({"job_id": job_id, "status": "complete", "video_url": f"/api/jobs/{job_id}/final_short.mp4", "captions_url": f"/api/jobs/{job_id}/captions.srt", "sources": sources})
+    return jsonify({"job_id": job_id, "status": "complete", "script": narration, "video_url": f"/api/jobs/{job_id}/final_short.mp4", "captions_url": f"/api/jobs/{job_id}/captions.srt", "sources": sources})
 
 @app.get("/api/jobs/<job_id>/<path:filename>")
 def job_file(job_id, filename):
