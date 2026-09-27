@@ -2,6 +2,24 @@
 
 AI-assisted YouTube Shorts automation pipeline.
 
+## V1: local web app
+
+Install Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Start the app:
+
+```bash
+python api.py
+```
+
+Then open `http://127.0.0.1:5000`.
+
+The current web UI creates a generation request and the local backend can render a vertical MP4 after narration is supplied. The current V1 does not require a paid LLM key.
+
 ## Goal
 
 Turn a simple prompt—or eventually an automatic topic trigger—into a finished vertical Short:
@@ -14,7 +32,7 @@ Future automation:
 
 ## Free-first approach
 
-The project is designed to use free/open-source tools and local processing wherever practical. Some third-party AI APIs may have free tiers, quotas, or usage limits, so the project does **not** promise unlimited free AI generation.
+The project prioritizes free/open-source/local components. Some third-party AI APIs may have free tiers, quotas, or usage limits, so the project does **not** promise unlimited free AI generation.
 
 ## Content direction
 
@@ -40,6 +58,7 @@ Avoid automatically publishing unverified claims. Research and source attributio
 - Captions
 - Vertical video rendering
 - Local output folder
+- Local web interface
 
 ### V2 — Research
 - Web/source collection
