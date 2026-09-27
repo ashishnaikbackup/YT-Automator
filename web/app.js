@@ -6,7 +6,7 @@ const status = document.querySelector('#status');
 const result = document.querySelector('#result');
 const output = document.querySelector('#output');
 
-button.addEventListener('click', () => {
+button.addEventListener('click', async () => {
   const value = topic.value.trim();
   if (!value) {
     status.textContent = 'Enter a topic first.';
@@ -14,13 +14,31 @@ button.addEventListener('click', () => {
   }
 
   result.classList.remove('hidden');
-  status.textContent = 'Preparing generation request…';
-  output.textContent = [
-    `Topic: ${value}`,
-    `Duration: ${duration.value}s`,
-    `Mode: ${mode.value}`,
-    '',
-    'The web UI is ready. The server-side generation endpoint will be connected next.',
-    'V2 will add automatic research and trend discovery.'
-  ].join('\n');
+  output.textContent = '';
+  status.textContent = 'Creating your generation job…';
+  button.disabled = true;
+
+  try {
+    const response = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: value, duration: Number(duration.value) })
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Generation request failed');
+
+    if (data.status === 'needs_script') {
+      status.textContent = 'Script prompt created.';
+      output.textContent = data.script_prompt + '\n\nV1 currently keeps the AI provider separate. Paste this prompt into your preferred AI model, then we will add one-click script generation in V2.';
+      return;
+    }
+
+    status.textContent = 'Short generated!';
+    output.innerHTML = `<video controls playsinline style="width:100%;max-height:70vh;border-radius:12px" src="${data.video_url}"></video><p><a href="${data.video_url}" target="_blank">Open video</a> · <a href="${data.captions_url}" target="_blank">Open captions</a></p>`;
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 });
