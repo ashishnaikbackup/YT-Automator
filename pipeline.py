@@ -47,9 +47,16 @@ Return narration only."""
 
 
 def make_tts(text: str, wav_path: Path):
-    safe = text.replace("'", "''")
-    ps = f"Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate=1; $s.Volume=100; $s.SetOutputToWaveFile('{wav_path.resolve()}'); $s.Speak(@'{safe}'@); $s.Dispose()"
-    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], check=True)
+    # Use a temporary UTF-8 text file instead of embedding the narration
+    # directly inside a PowerShell command. This safely handles apostrophes,
+    # quotes, punctuation, and multi-line text on Windows.
+    text_path = wav_path.with_suffix(".txt")
+    text_path.write_text(text, encoding="utf-8")
+    env = os.environ.copy()
+    env["YT_AUTOMATOR_TEXT"] = str(text_path.resolve())
+    env["YT_AUTOMATOR_WAV"] = str(wav_path.resolve())
+    ps = "Add-Type -AssemblyName System.Speech; $text=[System.IO.File]::ReadAllText($env:YT_AUTOMATOR_TEXT,[System.Text.Encoding]::UTF8); $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate=1; $s.Volume=100; $s.SetOutputToWaveFile($env:YT_AUTOMATOR_WAV); $s.Speak($text); $s.Dispose()"
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], check=True, env=env)
 
 
 def ffmpeg_path():
