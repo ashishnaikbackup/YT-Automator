@@ -1,9 +1,7 @@
-import json
 import os
 import re
 import shutil
 import subprocess
-import tempfile
 import uuid
 from pathlib import Path
 
@@ -27,24 +25,69 @@ def clean_script(text: str) -> str:
 
 
 def generate_script(topic: str, duration: int) -> str:
-    prompt = f"""Write ONLY the spoken narration for a YouTube Short about: {topic}\n\nTarget duration: {duration} seconds.\nRules:\n- Start with a strong hook.\n- Use simple, natural spoken English.\n- Fast pacing.\n- Give useful factual information.\n- Do not invent statistics, quotes, products, features, or events.\n- If a claim is uncertain, omit it.\n- End with a short call to action.\n- NO headings.\n- NO stage directions.\n- NO speaker labels.\n- NO notes.\nReturn narration only."""
+    prompt = f"""Write ONLY the spoken narration for a YouTube Short about: {topic}
+
+Target duration: {duration} seconds.
+Rules:
+- Start with a strong hook.
+- Use simple, natural spoken English.
+- Fast pacing.
+- Give useful factual information.
+- Do not invent statistics, quotes, products, features, or events.
+- If a claim is uncertain, omit it.
+- End with a short call to action.
+- NO headings.
+- NO stage directions.
+- NO speaker labels.
+- NO notes.
+Return narration only."""
     r = requests.post(OLLAMA_URL, json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}, timeout=300)
     r.raise_for_status()
     return clean_script(r.json().get("response", ""))
 
 
 def make_tts(text: str, wav_path: Path):
-    # Windows built-in SAPI voice: no API key and no cloud bill.
-    ps = f'''Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate=1; $s.Volume=100; $s.SetOutputToWaveFile('{wav_path.resolve()}'); $s.Speak(@'{text.replace("'", "''")}'@); $s.Dispose()'''
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True)
+    safe = text.replace("'", "''")
+    ps = f"Add-Type -AssemblyName System.Speech; $s=New-Object System.Speech.Synthesis.SpeechSynthesizer; $s.Rate=1; $s.Volume=100; $s.SetOutputToWaveFile('{wav_path.resolve()}'); $s.Speak(@'{safe}'@); $s.Dispose()"
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps], check=True)
 
 
-def make_video(audio: Path, script: str, out_path: Path, duration: int):
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        raise RuntimeError("FFmpeg is not installed or not on PATH. Install FFmpeg, then reopen Command Prompt.")
-    # A clean dark vertical canvas with readable timed text. This keeps V1 fully local/free.
-    vf = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,drawtext=text='YT-Automator':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=180"
+def ffmpeg_path():
+    direct = shutil.which("ffmpeg")
+    if direct:
+        return direct
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception as exc:
+        raise RuntimeError("FFmpeg is missing. Run run_local.bat again so the free local FFmpeg package can be installed.") from exc
+
+
+def make_srt(script: str, srt_path: Path, duration: int):
+    words = script.split()
+    if not words:
+        raise RuntimeError("Ollama returned an empty script.")
+    chunks = [" ".join(words[i:i + 7]) for i in range(0, len(words), 7)]
+    total = max(duration, 1)
+    step = total / len(chunks)
+    lines = []
+    for i, chunk in enumerate(chunks):
+        start = i * step
+        end = min(total, (i + 1) * step)
+        def ts(sec):
+            ms = int(round((sec - int(sec)) * 1000))
+            whole = int(sec)
+            h, rem = divmod(whole, 3600)
+            m, s = divmod(rem, 60)
+            return f"{h:02}:{m:02}:{s:02},{ms:03}"
+        lines += [str(i + 1), f"{ts(start)} --> {ts(end)}", chunk, ""]
+    srt_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def make_video(audio: Path, srt: Path, out_path: Path):
+    ffmpeg = ffmpeg_path()
+    subtitle_file = str(srt.resolve()).replace("\\", "/").replace(":", "\\:")
+    vf = f"drawtext=text='YT-Automator':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=150,subtitles='{subtitle_file}'"
     cmd = [ffmpeg, "-y", "-f", "lavfi", "-i", "color=c=black:s=1080x1920:r=30", "-i", str(audio), "-vf", vf, "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", str(out_path)]
     subprocess.run(cmd, check=True)
 
@@ -57,6 +100,8 @@ def generate_short(topic: str, duration: int):
     (job_dir / "script.txt").write_text(script, encoding="utf-8")
     audio = job_dir / "voice.wav"
     make_tts(script, audio)
+    srt = job_dir / "captions.srt"
+    make_srt(script, srt, duration)
     final = job_dir / "final_short.mp4"
-    make_video(audio, script, final, duration)
+    make_video(audio, srt, final)
     return {"job_id": job, "script": script, "video_url": f"/outputs/{job}/final_short.mp4"}
