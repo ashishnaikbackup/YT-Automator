@@ -6,39 +6,51 @@ AI-assisted YouTube Shorts automation pipeline.
 
 **Live app:** https://yt-automator.onrender.com
 
-The web app is deployed from this repository's `v1-prompt-to-short` branch. The same repo contains the frontend and Python backend; there is no separate codebase for the hosted page.
+The web app is deployed from this repository. The same repo contains the frontend and Python backend.
 
-## V1: local and hosted web app
+## What it does
 
-Install Python dependencies:
+`Prompt → Research → Script → Voice → Captions → Render`
+
+The project also includes foundations for:
+
+`Trending topics → Research → Script → Video`
+
+## ₹0 / free-first design
+
+This project is designed so the core workflow can be run without paid API subscriptions.
+
+- **Research:** public RSS/news sources; no API key required.
+- **Script:** local Ollama model support.
+- **Voice:** Edge TTS support.
+- **Captions:** generated locally.
+- **Rendering:** MoviePy/FFmpeg locally.
+- **Web UI:** Flask.
+
+Free cloud providers can change quotas or availability. The project therefore does not claim unlimited free cloud AI. For a genuinely ₹0 setup, run the AI model locally with Ollama and render locally.
+
+### Local setup
+
+Install Python 3.11+ and FFmpeg, then:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Start locally:
+Install Ollama and pull a small model, for example:
 
 ```bash
+ollama pull llama3.2:3b
+```
+
+Start the app:
+
+```bash
+set LLM_PROVIDER=ollama
 python api.py
 ```
 
-Then open `http://127.0.0.1:5000`.
-
-The hosted app is intended to provide the same web interface through Render. The current V1 can create a generation request and the backend can render a vertical MP4 after narration is supplied. The current V1 does not require a paid LLM key.
-
-## Goal
-
-Turn a simple prompt—or eventually an automatic topic trigger—into a finished vertical Short:
-
-`Topic → Research → Script → Voice → Visuals → Captions → Render`
-
-Future automation:
-
-`Trending topics → Research → Fact check → Script → Voice → Visuals → Captions → Render → YouTube`
-
-## Free-first approach
-
-The project prioritizes free/open-source/local components. Some third-party AI APIs may have free tiers, quotas, or usage limits, so the project does **not** promise unlimited free AI generation.
+Open `http://127.0.0.1:5000`.
 
 ## Content direction
 
@@ -52,44 +64,43 @@ Examples:
 - Tech explained in 30–60 seconds
 - Interesting engineering/VLSI technology
 
-Avoid automatically publishing unverified claims. Research and source attribution should be part of the pipeline before publishing.
+Research and source attribution should be part of the workflow before publishing. Do not automatically publish unverified claims.
 
 ## Roadmap
 
 ### V1 — Prompt to Short
-- Prompt/topic input
-- Script generation
-- Voice generation
-- Visual asset handling
+- Web prompt UI
+- Script prompt
+- Voice
 - Captions
-- Vertical video rendering
-- Local output folder
-- Local web interface
-- Hosted web interface
+- Vertical MP4 rendering
 
-### V2 — Research
-- Web/source collection
-- Source extraction
-- Research summary
-- Basic fact-checking workflow
+### V2 — Research + local AI
+- Recent news/RSS research
+- Research-aware script prompts
+- Local Ollama script generation
+- Trend discovery foundation
 
-### V3 — Trend discovery
-- Discover candidate topics
-- Rank candidates using configurable signals
-- Human approval option before generation
+### V3 — Visual scenes
+- Scene splitting
+- Visual plans
+- Free/generated assets
+- Animated captions and transitions
 
-### V4 — Batch automation
-- Generate multiple Shorts
-- Queue jobs
-- Retry failed stages
-- Structured project folders
+### V4 — Automation
+- Automatic topic selection
+- Batch generation
+- Queue/retry handling
+- Scheduled generation
 
 ### V5 — Publishing
 - Title/description/hashtags
-- Thumbnail generation
+- Thumbnail
 - YouTube API integration
-- Private/unlisted test upload before public publishing
+- Private/unlisted approval workflow
 
-## Project principle
+## Project status
 
-Build small, test every stage, and prefer free/local components before adding paid APIs.
+**Core prototype:** built.
+
+**Important:** the hosted free web app is a demo/deployment surface. For a truly ₹0 end-to-end AI generation workflow, use the local setup so model inference and rendering happen on your own computer.
