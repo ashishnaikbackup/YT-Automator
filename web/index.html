@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YT-Automator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="badge">YT-AUTOMATOR</div>
+      <h1>Turn an idea into a Short.</h1>
+      <p>Prompt → research → script → voice → visuals → captions → video.</p>
+    </header>
+
+    <section class="card">
+      <label for="topic">What should the Short be about?</label>
+      <textarea id="topic" placeholder="Example: 5 free AI tools every engineering student should know"></textarea>
+
+      <div class="row">
+        <label>Duration
+          <select id="duration">
+            <option value="30">30 sec</option>
+            <option value="45" selected>45 sec</option>
+            <option value="60">60 sec</option>
+          </select>
+        </label>
+        <label>Mode
+          <select id="mode">
+            <option value="prompt" selected>Prompt</option>
+            <option value="auto">Auto research (coming next)</option>
+          </select>
+        </label>
+      </div>
+
+      <button id="generate">Generate Short</button>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section class="pipeline">
+      <span>Research</span><i>→</i><span>Script</span><i>→</i><span>Voice</span><i>→</i><span>Visuals</span><i>→</i><span>Captions</span><i>→</i><span>MP4</span>
+    </section>
+
+    <section id="result" class="card result hidden">
+      <h2>Generation job</h2>
+      <pre id="output"></pre>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
