@@ -2,7 +2,13 @@
 
 AI-assisted YouTube Shorts automation pipeline.
 
-## V1: local web app
+## 🌐 Live web app
+
+**Live app:** https://yt-automator.onrender.com
+
+The web app is deployed from this repository's `v1-prompt-to-short` branch. The same repo contains the frontend and Python backend; there is no separate codebase for the hosted page.
+
+## V1: local and hosted web app
 
 Install Python dependencies:
 
@@ -10,7 +16,7 @@ Install Python dependencies:
 pip install -r requirements.txt
 ```
 
-Start the app:
+Start locally:
 
 ```bash
 python api.py
@@ -18,7 +24,7 @@ python api.py
 
 Then open `http://127.0.0.1:5000`.
 
-The current web UI creates a generation request and the local backend can render a vertical MP4 after narration is supplied. The current V1 does not require a paid LLM key.
+The hosted app is intended to provide the same web interface through Render. The current V1 can create a generation request and the backend can render a vertical MP4 after narration is supplied. The current V1 does not require a paid LLM key.
 
 ## Goal
 
@@ -59,6 +65,7 @@ Avoid automatically publishing unverified claims. Research and source attributio
 - Vertical video rendering
 - Local output folder
 - Local web interface
+- Hosted web interface
 
 ### V2 — Research
 - Web/source collection
