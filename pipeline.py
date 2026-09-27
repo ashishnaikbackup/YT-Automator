@@ -13,6 +13,7 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 OUTPUT_DIR = Path("outputs")
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+OPENVERSE_API = "https://api.openverse.org/v1/images/"
 
 
 def clean_script(text: str) -> str:
@@ -68,7 +69,6 @@ def make_tts(text: str, wav_path: Path):
         import edge_tts
 
         async def synthesize():
-            # Andrew is natural and energetic; rate/pitch keep the delivery lively.
             communicate = edge_tts.Communicate(
                 text,
                 "en-US-AndrewMultilingualNeural",
@@ -106,6 +106,32 @@ $s.Dispose()'''
 def audio_duration(wav_path: Path) -> float:
     with wave.open(str(wav_path), "rb") as w:
         return max(0.1, w.getnframes() / float(w.getframerate()))
+
+
+def openverse_image(query: str, session: requests.Session):
+    """Find a reusable image through Openverse (CC/public-domain sources)."""
+    params = {
+        "q": query,
+        "page_size": 20,
+        "license_type": "commercial",
+    }
+    r = session.get(OPENVERSE_API, params=params, timeout=25)
+    r.raise_for_status()
+    for item in r.json().get("results", []):
+        license_code = (item.get("license") or "").lower()
+        if license_code not in {"cc0", "by", "by-sa", "by-nc", "by-nc-sa", "by-nd", "by-nc-nd"}:
+            continue
+        url = item.get("thumbnail") or item.get("url")
+        if not url:
+            continue
+        return {
+            "title": item.get("title") or query,
+            "url": url,
+            "source": item.get("foreign_landing_url") or item.get("url") or "https://openverse.org/",
+            "license": (item.get("license") or "").upper(),
+            "artist": item.get("creator") or "",
+        }
+    return None
 
 
 def commons_search(query: str, session: requests.Session):
@@ -152,7 +178,6 @@ def visual_queries(topic: str, script: str):
         if w not in stop and len(w) >= 4 and w not in terms:
             terms.append(w)
     queries = [topic.strip()]
-    # Strong generic visual concepts for common AI/engineering topics.
     if any(x in text for x in ["ai", "artificial intelligence", "machine learning", "llm", "ollama", "chatbot"]):
         queries += ["artificial intelligence", "machine learning", "computer programming", "robot artificial intelligence"]
     if any(x in text for x in ["engineering", "engineer", "student", "college"]):
@@ -162,7 +187,6 @@ def visual_queries(topic: str, script: str):
             queries.append(f"{terms[i]} {terms[i+1]}")
         else:
             queries.append(terms[i])
-    # De-duplicate while keeping order and avoid very long searches.
     out, seen = [], set()
     for q in queries:
         q = re.sub(r"\s+", " ", q).strip()
@@ -172,16 +196,26 @@ def visual_queries(topic: str, script: str):
 
 
 def download_visuals(topic: str, script: str, job_dir: Path, count: int = 8):
+    """Download genuinely reusable visuals, preferring Openverse and falling back to Commons."""
     session = requests.Session()
-    session.headers.update({"User-Agent": "YT-Automator/1.1 (local video generator; visual retrieval)"})
+    session.headers.update({"User-Agent": "YT-Automator/1.2 (local video generator; visual retrieval)"})
     visuals, seen = [], set()
     for query in visual_queries(topic, script):
         if len(visuals) >= count:
             break
+        item = None
         try:
-            item = commons_image(query, session)
-            if not item or item["title"] in seen or not item["url"]:
-                continue
+            item = openverse_image(query, session)
+        except requests.RequestException as exc:
+            print(f"Openverse search failed for '{query}': {exc}")
+        if item is None:
+            try:
+                item = commons_image(query, session)
+            except requests.RequestException as exc:
+                print(f"Commons search failed for '{query}': {exc}")
+        if not item or item["title"] in seen or not item["url"]:
+            continue
+        try:
             response = session.get(item["url"], timeout=30)
             response.raise_for_status()
             if len(response.content) < 5000:
@@ -191,8 +225,9 @@ def download_visuals(topic: str, script: str, job_dir: Path, count: int = 8):
             item["path"] = path
             visuals.append(item)
             seen.add(item["title"])
+            print(f"Visual {len(visuals)}/{count}: {query} -> {item['title']}")
         except requests.RequestException as exc:
-            print(f"Visual search failed for '{query}': {exc}")
+            print(f"Visual download failed for '{query}': {exc}")
             continue
     if not visuals:
         raise RuntimeError("No usable free visuals were found. Check your internet connection and try again.")
@@ -210,7 +245,6 @@ def make_visual_video(images, out_path: Path, duration: float):
     clips = []
     for i, image in enumerate(images):
         clip = clip_dir / f"clip_{i+1}.mp4"
-        # Convert every downloaded image to a vertical moving shot.
         vf = (
             "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
             "zoompan=z='min(zoom+0.0012,1.14)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
