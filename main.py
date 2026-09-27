@@ -4,6 +4,8 @@ from pathlib import Path
 from config import OUTPUTS
 from script_generator import build_script_prompt, save_script
 from voice import generate_voice
+from captions import create_srt
+from renderer import render_short
 
 
 def main():
@@ -21,22 +23,36 @@ def main():
     prompt = build_script_prompt(topic, duration)
     (job_dir / "script_prompt.txt").write_text(prompt + "\n", encoding="utf-8")
 
-    print("\nPrompt created. For V1, paste this prompt into your chosen AI model and save the returned narration to script.txt:")
+    print("\nPrompt created. Paste this into your chosen AI model:")
     print("\n" + prompt + "\n")
 
-    narration = input("Paste the narration here (or press Enter to stop after creating the prompt): ").strip()
+    narration = input("Paste the generated narration here (or press Enter to stop): ").strip()
     if not narration:
         print(f"Saved prompt to: {job_dir / 'script_prompt.txt'}")
         return
 
     script_path = job_dir / "script.txt"
     save_script(narration, script_path)
+
     audio_path = job_dir / "voice.mp3"
     generate_voice(narration, audio_path)
 
-    print(f"Script: {script_path}")
-    print(f"Voice:  {audio_path}")
-    print("V1 voice stage complete. Video rendering is the next stage.")
+    from moviepy import AudioFileClip
+    audio = AudioFileClip(str(audio_path))
+    duration = audio.duration
+    audio.close()
+
+    srt_path = job_dir / "captions.srt"
+    create_srt(narration, duration, srt_path)
+
+    video_path = job_dir / "final_short.mp4"
+    render_short(narration, audio_path, video_path)
+
+    print("\nDone!")
+    print(f"Script:   {script_path}")
+    print(f"Voice:    {audio_path}")
+    print(f"Captions: {srt_path}")
+    print(f"Video:    {video_path}")
 
 
 if __name__ == "__main__":
